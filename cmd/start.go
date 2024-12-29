@@ -8,117 +8,99 @@ import (
 	"github.com/faiface/beep"
 	"github.com/faiface/beep/speaker"
 	"github.com/faiface/beep/wav"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
+)
+
+// Flags for the start command
+var (
+	seconds     int
+	minutes     int
+	hours       int
+	description string
 )
 
 // startCmd represents the start command
 var startCmd = &cobra.Command{
 	Use:   "start",
-	Short: "Set a timer and play a sound when the timer ends",
-	Long: `Set a timer for a specified duration using flags (-s for seconds, -m for minutes, --hours for hours). 
-When the timer ends, a default sound or an embedded sound will play for 5 minutes.`,
+	Short: "Start a new timer",
+	Long:  "Start a new timer with a specified duration and description.",
 	Run: func(cmd *cobra.Command, args []string) {
-		// タイマー状態を読み込む
-		if err := loadState(); err != nil {
-			fmt.Printf("Error loading timer state: %v\n", err)
+		duration := time.Duration(seconds+minutes*60+hours*3600) * time.Second
+		if duration <= 0 {
+			fmt.Println("Please specify a valid duration using --seconds, --minutes, or --hours.")
 			return
 		}
 
-		// タイマーの合計時間を計算
-		totalDuration := time.Duration(seconds+minutes*60+hours*3600) * time.Second
-		if totalDuration <= 0 {
-			fmt.Println("Please specify a valid timer duration using -s, -m, or --hours.")
+		id := uuid.New().String()
+		timer := &Timer{
+			ID:          id,
+			Description: description,
+			Time:        time.Now().Add(duration),
+		}
+
+		if err := saveTimer(timer); err != nil {
+			fmt.Printf("Error saving timer state: %v\n", err)
 			return
 		}
 
-		// 新しいタイマーを追加
-		id, err := addTimer(description, totalDuration)
-		if err != nil {
-			fmt.Printf("Error adding timer: %v\n", err)
-			return
-		}
+		fmt.Printf("Timer started: ID=%s, Description=%s, Duration=%s\n", id, description, duration)
 
-		fmt.Printf("Timer started: ID=%s, Description=%s, Duration=%s\n", id, description, totalDuration)
-
-		// タイマーの実行
-		for i := time.Duration(0); i < totalDuration; i += time.Second {
-			time.Sleep(time.Second)
-
-			// タイマーが停止されているか確認
-			if err := loadState(); err != nil {
-				fmt.Printf("Error loading timer state: %v\n", err)
-				break
-			}
-
-			mu.Lock()
-			for _, timer := range timers {
-				if timer.ID == id && !timer.TimerRunning {
-					fmt.Println("Timer was stopped manually.")
-					mu.Unlock()
-					return
-				}
-			}
-			mu.Unlock()
-		}
-
-		// タイマー終了
-		fmt.Printf("Timer ended: ID=%s, Description=%s\n", id, description)
-		go func() {
-			err := playEmbeddedSoundRepeatedly(id)
-			if err != nil {
-				fmt.Printf("Error playing sound: %v\n", err)
-			}
-		}()
-
-		// サウンドを5分後に停止
-		time.Sleep(5 * time.Minute)
-		if err := stopTimer(id); err != nil {
-			fmt.Printf("Error stopping timer sound: %v\n", err)
-		}
+		runTimer(timer)
 	},
 }
 
-// playEmbeddedSoundRepeatedly 再生を繰り返す関数
-func playEmbeddedSoundRepeatedly(id string) error {
-	mu.Lock()
-	var stopChannel chan struct{}
-	for i, timer := range timers {
-		if timer.ID == id {
-			stopChannel = timer.StopChannel
-			timers[i].TimerRunning = true
-			saveState()
-			break
-		}
-	}
-	mu.Unlock()
+// Run a timer in a separate goroutine
+func runTimer(timer *Timer) {
+	duration := time.Until(timer.Time)
+	time.Sleep(duration)
 
-	if stopChannel == nil {
-		return fmt.Errorf("stop channel not found for timer ID: %s", id)
-	}
+	fmt.Printf("Timer ended: ID=%s, Description=%s\n", timer.ID, timer.Description)
+	playSound(timer)
+}
 
+// Play sound when a timer ends
+func playSound(timer *Timer) {
 	streamer, format, err := wav.Decode(bytes.NewReader(embeddedSound))
 	if err != nil {
-		return fmt.Errorf("could not decode embedded sound: %v", err)
+		fmt.Printf("Error decoding sound: %v\n", err)
+		return
 	}
 	defer streamer.Close()
 
 	err = speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
 	if err != nil {
-		return fmt.Errorf("could not initialize speaker: %v", err)
+		fmt.Printf("Error initializing speaker: %v\n", err)
+		return
 	}
 
 	loop := beep.Loop(-1, streamer)
 	speaker.Play(beep.Seq(loop))
 
-	select {
-	case <-stopChannel:
-		fmt.Println("Stop signal received. Stopping playback.")
+	duration := 5 * time.Minute
+	for remaining := duration; remaining > 0; remaining -= time.Second {
+		if err := loadState(); err != nil {
+			fmt.Printf("Error loading timer state: %v\n", err)
+		}
+
+		exists := getSoundRunningStateById(timer.ID)
+
+		if !exists {
+			fmt.Println("Sound stopped")
+			speaker.Clear()
+			break
+		}
+		time.Sleep(time.Second)
 	}
 
-	speaker.Close()
-	stopTimer(id)
-
-	return nil
+	mu.Lock()
+	_, exists := timers[timerID]
+	if exists {
+		if err := stopTimer(timerID); err != nil {
+			fmt.Printf("Error stopping timer: %v\n", err)
+		}
+	}
+	mu.Unlock()
 }
 
 func init() {

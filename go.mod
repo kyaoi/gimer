@@ -4,6 +4,7 @@ go 1.23.2
 
 require (
 	github.com/faiface/beep v1.1.0
+	github.com/google/uuid v1.6.0
 	github.com/spf13/cobra v1.8.1
 )
 

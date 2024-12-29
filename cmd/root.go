@@ -7,14 +7,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// rootCmd is the base command
+// rootCmd represents the base command
 var rootCmd = &cobra.Command{
 	Use:   "gimer",
-	Short: "A CLI timer tool",
-	Long:  "Gimer is a CLI tool for setting and managing timers.",
+	Short: "A CLI timer application",
+	Long:  "Gimer is a CLI tool for managing timers with start, stop, and status commands.",
 }
 
-// Execute runs the root command
+// Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

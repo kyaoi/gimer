@@ -10,57 +10,50 @@ import (
 	"time"
 )
 
-var (
-	seconds     int
-	minutes     int
-	hours       int
-	description string
-)
-
-// タイマーの共有状態
-var (
-	mu     sync.Mutex
-	timers []TimerState // 複数のタイマー状態
-)
+// Timer represents a single timer's state
+type Timer struct {
+	ID          string    `json:"id"`
+	Description string    `json:"description"`
+	Time        time.Time `json:"active_timer_end"`
+}
 
 //go:embed resources/sound.wav
 var embeddedSound []byte
 
-// 状態構造体
-type TimerState struct {
-	ID             string        `json:"id"`
-	Description    string        `json:"description"`
-	TimerRunning   bool          `json:"timer_running"`
-	ActiveTimerEnd time.Time     `json:"active_timer_end"`
-	StopChannel    chan struct{} `json:"-"` // JSONには保存しない
-}
+// Global variables for managing timers
+var (
+	mu     sync.Mutex
+	timers = make(map[string]*Timer)
+)
 
-// 状態ファイルのパスを取得
+// Get the file path for the state file
 func getStateFilePath() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	// ディレクトリパス
-	gimerDir := filepath.Join(homeDir, ".gimer")
-	// ディレクトリが存在しない場合は作成
-	if _, err := os.Stat(gimerDir); os.IsNotExist(err) {
-		if err := os.Mkdir(gimerDir, 0755); err != nil {
+
+	stateDir := filepath.Join(homeDir, ".gimer")
+	if _, err := os.Stat(stateDir); os.IsNotExist(err) {
+		if err := os.Mkdir(stateDir, 0755); err != nil {
 			return "", err
 		}
 	}
-	// 状態ファイルのフルパス
-	return filepath.Join(gimerDir, "timer_state.json"), nil
+
+	return filepath.Join(stateDir, "timer_state.json"), nil
 }
 
-// 状態を保存
-func saveState() error {
-	stateFilePath, err := getStateFilePath()
+func saveTimer(timer *Timer) error {
+	timers[timer.ID] = timer
+	filePath, err := getStateFilePath()
 	if err != nil {
-		return err
+		return fmt.Errorf("Error loading timer state json file: %v\n", err)
 	}
 
-	file, err := os.Create(stateFilePath)
+	mu.Lock()
+	defer mu.Unlock()
+
+	file, err := os.Create(filePath)
 	if err != nil {
 		return err
 	}
@@ -70,92 +63,63 @@ func saveState() error {
 	return encoder.Encode(timers)
 }
 
-// 状態を読み取り
+func stopTimer(id string) error {
+	if timer, exists := timers[id]; exists {
+		filePath, err := getStateFilePath()
+		if err != nil {
+			return fmt.Errorf("Error loading timer state json file: %v\n", err)
+		}
+
+		fmt.Println("Stopping timer with ID:", id)
+		file, err := os.Create(filePath)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		delete(timers, id)
+		encoder := json.NewEncoder(file)
+		if err := encoder.Encode(timers); err != nil {
+			if err := saveTimer(timer); err != nil {
+				return fmt.Errorf("Error saving timer state: %v\n", err)
+			}
+		}
+		fmt.Println("Ended timer with description:", timer.Description)
+		return nil
+	}
+	return fmt.Errorf("Timer not found")
+}
+
 func loadState() error {
-	stateFilePath, err := getStateFilePath()
+	filePath, err := getStateFilePath()
 	if err != nil {
-		return err
+		return fmt.Errorf("Error loading timer state json file: %v\n", err)
 	}
 
-	file, err := os.Open(stateFilePath)
-	if os.IsNotExist(err) {
-		// ファイルが存在しない場合は初期化
-		timers = []TimerState{}
-		return nil
-	} else if err != nil {
+	mu.Lock()
+	defer mu.Unlock()
+
+	file, err := os.Open(filePath)
+	if err != nil {
 		return err
 	}
 	defer file.Close()
 
+	var loadedTimers map[string]*Timer
 	decoder := json.NewDecoder(file)
-	if err := decoder.Decode(&timers); err != nil {
-		// 不正な形式の場合、初期化して上書き
-		timers = []TimerState{}
-		if err := saveState(); err != nil {
-			return err
-		}
+	if err := decoder.Decode(&loadedTimers); err != nil {
+		return fmt.Errorf("Failed to decode timer state: %v\n", err)
 	}
 
-	// チャネルの初期化
-	for i := range timers {
-		if timers[i].TimerRunning {
-			timers[i].StopChannel = make(chan struct{})
-		}
-	}
+	timers = loadedTimers // メモリ内のtimersマップを更新
 
 	return nil
 }
 
-// 新しいタイマーを追加
-func addTimer(description string, duration time.Duration) (string, error) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	id := generateID()
-	newTimer := TimerState{
-		ID:             id,
-		Description:    description,
-		TimerRunning:   true,
-		ActiveTimerEnd: time.Now().Add(duration),
-		StopChannel:    make(chan struct{}),
+func getSoundRunningStateById(id string) bool {
+	for _, timer := range timers {
+		fmt.Println("timer: ", timer)
 	}
-
-	timers = append(timers, newTimer)
-	return id, saveState()
-}
-
-// タイマーを停止
-func stopTimer(id string) error {
-	mu.Lock()
-	defer mu.Unlock()
-
-	for i, timer := range timers {
-		if timer.ID == id {
-			// タイマーを停止
-			timers[i].TimerRunning = false
-
-			// サウンド再生中なら停止
-			if timers[i].StopChannel != nil {
-				close(timers[i].StopChannel) // チャネルを閉じることで再生を停止
-				timers[i].StopChannel = nil  // チャネルをクリア
-			}
-
-			// 状態を保存
-			return saveState()
-		}
-	}
-	return fmt.Errorf("timer not found")
-}
-
-// 全タイマーの状態を取得
-func getTimers() []TimerState {
-	mu.Lock()
-	defer mu.Unlock()
-
-	return timers
-}
-
-// タイマーIDを生成
-func generateID() string {
-	return fmt.Sprintf("%d", time.Now().UnixNano())
+	_, exists := timers[id]
+	return exists
 }

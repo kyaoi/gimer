@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -9,29 +10,29 @@ import (
 // statusCmd represents the status command
 var statusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Check the status of all timers",
-	Long:  "Displays the status of all currently running timers.",
+	Short: "Display the current status of all timers",
+	Long:  "Display the current status of all timers including their ID, description, and remaining time.",
 	Run: func(cmd *cobra.Command, args []string) {
-		// タイマー状態を読み込む
 		if err := loadState(); err != nil {
 			fmt.Printf("Error loading timer state: %v\n", err)
-			return
 		}
 
-		timers := getTimers()
+		mu.Lock()
+		defer mu.Unlock()
+
 		if len(timers) == 0 {
-			fmt.Println("No timers found.")
+			fmt.Println("No timers currently running.")
 			return
 		}
 
 		fmt.Println("Current timers:")
-		for _, timer := range timers {
-			status := "Running"
-			if !timer.TimerRunning {
-				status = "Stopped"
+		for id, timer := range timers {
+			remaining := time.Until(timer.Time)
+			if remaining < 0 {
+				remaining = 0
 			}
-			fmt.Printf("- ID: %s, Description: %s, End Time: %s, Status: %s\n",
-				timer.ID, timer.Description, timer.ActiveTimerEnd.Format("15:04:05"), status)
+			fmt.Printf("- ID: %s, Description: %s, Remaining: %s\n",
+				id, timer.Description, remaining)
 		}
 	},
 }
