@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// statusCmd represents the status command
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Display the current status of all timers",
@@ -26,13 +25,13 @@ var statusCmd = &cobra.Command{
 		}
 
 		fmt.Println("Current timers:")
-		for id, timer := range timers {
+		for _, timer := range timers {
 			remaining := time.Until(timer.Time)
 			if remaining < 0 {
 				remaining = 0
 			}
-			fmt.Printf("- ID: %s, Description: %s, Remaining: %s\n",
-				id, timer.Description, remaining)
+			fmt.Printf("Description: %s, Remaining: %s\n",
+				timer.Description, remaining)
 		}
 	},
 }

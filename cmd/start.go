@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Flags for the start command
 var (
 	seconds     int
 	minutes     int
@@ -20,7 +19,6 @@ var (
 	description string
 )
 
-// startCmd represents the start command
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start a new timer",
@@ -30,6 +28,9 @@ var startCmd = &cobra.Command{
 		if duration <= 0 {
 			fmt.Println("Please specify a valid duration using --seconds, --minutes, or --hours.")
 			return
+		}
+		if err := loadState(); err != nil {
+			fmt.Printf("Error loading timer state: %v\n", err)
 		}
 
 		id := uuid.New().String()
@@ -50,7 +51,6 @@ var startCmd = &cobra.Command{
 	},
 }
 
-// Run a timer in a separate goroutine
 func runTimer(timer *Timer) {
 	duration := time.Until(timer.Time)
 	time.Sleep(duration)
@@ -59,7 +59,6 @@ func runTimer(timer *Timer) {
 	playSound(timer)
 }
 
-// Play sound when a timer ends
 func playSound(timer *Timer) {
 	streamer, format, err := wav.Decode(bytes.NewReader(embeddedSound))
 	if err != nil {

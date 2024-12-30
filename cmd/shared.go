@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-// Timer represents a single timer's state
 type Timer struct {
 	ID          string    `json:"id"`
 	Description string    `json:"description"`
@@ -20,13 +19,15 @@ type Timer struct {
 //go:embed resources/sound.wav
 var embeddedSound []byte
 
-// Global variables for managing timers
 var (
 	mu     sync.Mutex
 	timers = make(map[string]*Timer)
 )
 
-// Get the file path for the state file
+var timerID string
+
+var timerIndexMap = make(map[int]string)
+
 func getStateFilePath() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -41,6 +42,32 @@ func getStateFilePath() (string, error) {
 	}
 
 	return filepath.Join(stateDir, "timer_state.json"), nil
+}
+
+func loadState() error {
+	filePath, err := getStateFilePath()
+	if err != nil {
+		return fmt.Errorf("Error loading timer state json file: %v\n", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	var loadedTimers map[string]*Timer
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&loadedTimers); err != nil {
+		return fmt.Errorf("Failed to decode timer state: %v\n", err)
+	}
+
+	timers = loadedTimers
+
+	return nil
 }
 
 func saveTimer(timer *Timer) error {
@@ -90,36 +117,38 @@ func stopTimer(id string) error {
 	return fmt.Errorf("Timer not found")
 }
 
-func loadState() error {
+func stopAllTimer() error {
 	filePath, err := getStateFilePath()
 	if err != nil {
 		return fmt.Errorf("Error loading timer state json file: %v\n", err)
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
-
-	file, err := os.Open(filePath)
+	file, err := os.Create(filePath)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	var loadedTimers map[string]*Timer
-	decoder := json.NewDecoder(file)
-	if err := decoder.Decode(&loadedTimers); err != nil {
-		return fmt.Errorf("Failed to decode timer state: %v\n", err)
+	timerBackup := timers
+	timers = make(map[string]*Timer)
+	encoder := json.NewEncoder(file)
+	if err := encoder.Encode(timers); err != nil {
+		timers = timerBackup
+		return fmt.Errorf("Error saving timer state: %v\n", err)
 	}
-
-	timers = loadedTimers // メモリ内のtimersマップを更新
-
 	return nil
 }
 
 func getSoundRunningStateById(id string) bool {
-	for _, timer := range timers {
-		fmt.Println("timer: ", timer)
-	}
 	_, exists := timers[id]
 	return exists
+}
+
+func generateTimerIndex() error {
+	number := 1
+	for _, timer := range timers {
+		timerIndexMap[number] = timer.ID
+		number++
+	}
+	return nil
 }
