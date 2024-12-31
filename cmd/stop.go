@@ -86,6 +86,7 @@ var stopCmd = &cobra.Command{
 }
 
 func init() {
+	// TODO: 保存したタイマーを削除できるようにする
 	stopCmd.Flags().BoolVarP(&stopAll, "all", "a", false, "Stop all timers")
 	rootCmd.AddCommand(stopCmd)
 }

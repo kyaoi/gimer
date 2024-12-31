@@ -202,11 +202,11 @@ func playSound(timer *ActiveTimer) {
 }
 
 func init() {
-	startCmd.Flags().IntVarP(&seconds, "seconds", "s", 0, "Set timer duration in seconds")
-	startCmd.Flags().IntVarP(&minutes, "minutes", "m", 0, "Set timer duration in minutes")
-	startCmd.Flags().IntVar(&hours, "hours", 0, "Set timer duration in hours")
+	startCmd.Flags().IntVarP(&seconds, "seconds", "S", 0, "Set timer duration in seconds")
+	startCmd.Flags().IntVarP(&minutes, "minutes", "M", 0, "Set timer duration in minutes")
+	startCmd.Flags().IntVarP(&hours, "hours", "H", 0, "Set timer duration in hours")
 	startCmd.Flags().StringVarP(&description, "description", "d", "Timer", "Set a description for the timer")
-	startCmd.Flags().BoolVarP(&save, "save", "S", false, "Save timer state to file")
+	startCmd.Flags().BoolVarP(&save, "save", "s", false, "Save timer state to file")
 	startCmd.Flags().BoolVarP(&useSaveTimer, "use", "u", false, "Use a saved timer")
 	rootCmd.AddCommand(startCmd)
 }
