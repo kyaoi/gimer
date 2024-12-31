@@ -65,8 +65,18 @@ func getActiveTimerFilePath() (string, error) {
 	return filepath.Join(d, activeTimerFile), nil
 }
 
+func openOrCreateFile(p string) (*os.File, error) {
+	if _, err := os.Stat(p); os.IsNotExist(err) {
+		return os.Create(p)
+	} else if err != nil {
+		return nil, fmt.Errorf("error checking file existence: %v", err)
+	}
+
+	return os.Open(p)
+}
+
 func loadSavedTimers() error {
-	filePath, err := getSavedTimersFilePath()
+	p, err := getSavedTimersFilePath()
 	if err != nil {
 		return fmt.Errorf("Error loading saved timers json file: %v\n", err)
 	}
@@ -74,14 +84,24 @@ func loadSavedTimers() error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	file, err := os.Open(filePath)
+	f, err := openOrCreateFile(p)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer f.Close()
+
+	stat, err := f.Stat()
+	if err != nil {
+		return fmt.Errorf("Error getting file info: %v", err)
+	}
+
+	if stat.Size() == 0 {
+		savedTimers = make(map[string]*Timer)
+		return nil
+	}
 
 	var loadedTimers map[string]*Timer
-	decoder := json.NewDecoder(file)
+	decoder := json.NewDecoder(f)
 	if err := decoder.Decode(&loadedTimers); err != nil {
 		return fmt.Errorf("Failed to decode saved timers: %v\n", err)
 	}
@@ -92,7 +112,7 @@ func loadSavedTimers() error {
 }
 
 func loadActiveTimerState() error {
-	filePath, err := getActiveTimerFilePath()
+	p, err := getActiveTimerFilePath()
 	if err != nil {
 		return fmt.Errorf("Error loading timer state json file: %v\n", err)
 	}
@@ -100,14 +120,24 @@ func loadActiveTimerState() error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	file, err := os.Open(filePath)
+	f, err := openOrCreateFile(p)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer f.Close()
+
+	stat, err := f.Stat()
+	if err != nil {
+		return fmt.Errorf("Error getting file info: %v", err)
+	}
+
+	if stat.Size() == 0 {
+		activeTimers = make(map[string]*Timer)
+		return nil
+	}
 
 	var loadedTimers map[string]*Timer
-	decoder := json.NewDecoder(file)
+	decoder := json.NewDecoder(f)
 	if err := decoder.Decode(&loadedTimers); err != nil {
 		return fmt.Errorf("Failed to decode timer state: %v\n", err)
 	}
@@ -119,7 +149,7 @@ func loadActiveTimerState() error {
 
 func saveSavedTimers(timer *Timer) error {
 	savedTimers[timer.ID] = timer
-	filePath, err := getSavedTimersFilePath()
+	p, err := getSavedTimersFilePath()
 	if err != nil {
 		return fmt.Errorf("Error loading saved timers json file: %v\n", err)
 	}
@@ -127,20 +157,20 @@ func saveSavedTimers(timer *Timer) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	file, err := os.Create(filePath)
+	f, err := os.Create(p)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer f.Close()
 
-	encoder := json.NewEncoder(file)
+	encoder := json.NewEncoder(f)
 	return encoder.Encode(savedTimers)
 
 }
 
 func saveActiveTimer(timer *Timer) error {
 	activeTimers[timer.ID] = timer
-	filePath, err := getActiveTimerFilePath()
+	p, err := getActiveTimerFilePath()
 	if err != nil {
 		return fmt.Errorf("Error loading timer state json file: %v\n", err)
 	}
@@ -148,32 +178,32 @@ func saveActiveTimer(timer *Timer) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	file, err := os.Create(filePath)
+	f, err := os.Create(p)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer f.Close()
 
-	encoder := json.NewEncoder(file)
+	encoder := json.NewEncoder(f)
 	return encoder.Encode(activeTimers)
 }
 
 func stopTimer(id string) error {
 	if timer, exists := activeTimers[id]; exists {
-		filePath, err := getActiveTimerFilePath()
+		p, err := getActiveTimerFilePath()
 		if err != nil {
 			return fmt.Errorf("Error loading timer state json file: %v\n", err)
 		}
 
 		fmt.Println("Stopping timer with ID:", id)
-		file, err := os.Create(filePath)
+		f, err := os.Create(p)
 		if err != nil {
 			return err
 		}
-		defer file.Close()
+		defer f.Close()
 
 		delete(activeTimers, id)
-		encoder := json.NewEncoder(file)
+		encoder := json.NewEncoder(f)
 		if err := encoder.Encode(activeTimers); err != nil {
 			if err := saveActiveTimer(timer); err != nil {
 				return fmt.Errorf("Error saving timer state: %v\n", err)
@@ -186,20 +216,20 @@ func stopTimer(id string) error {
 }
 
 func stopAllTimer() error {
-	filePath, err := getActiveTimerFilePath()
+	p, err := getActiveTimerFilePath()
 	if err != nil {
 		return fmt.Errorf("Error loading timer state json file: %v\n", err)
 	}
 
-	file, err := os.Create(filePath)
+	f, err := os.Create(p)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer f.Close()
 
 	activeTimersBackup := activeTimers
 	activeTimers = make(map[string]*Timer)
-	encoder := json.NewEncoder(file)
+	encoder := json.NewEncoder(f)
 	if err := encoder.Encode(activeTimers); err != nil {
 		activeTimers = activeTimersBackup
 		return fmt.Errorf("Error saving timer state: %v\n", err)

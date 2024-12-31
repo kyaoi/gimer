@@ -58,7 +58,7 @@ var startCmd = &cobra.Command{
 			}
 		}
 
-		fmt.Printf("Timer started: ID=%s, Description=%s, Duration=%s\n", id, description, duration)
+		fmt.Printf("Timer started: Description=%s, Duration=%s\n", description, duration)
 
 		runTimer(timer)
 	},
@@ -68,7 +68,7 @@ func runTimer(timer *Timer) {
 	duration := time.Until(timer.Time)
 	time.Sleep(duration)
 
-	fmt.Printf("Timer ended: ID=%s, Description=%s\n", timer.ID, timer.Description)
+	fmt.Printf("Timer ended: Description=%s\n", timer.Description)
 	playSound(timer)
 }
 
