@@ -26,7 +26,7 @@ var statusCmd = &cobra.Command{
 
 		fmt.Println("Current timers:")
 		for _, timer := range activeTimers {
-			remaining := time.Until(timer.Time)
+			remaining := time.Until(timer.TriggerTimer)
 			if remaining < 0 {
 				remaining = 0
 			}
