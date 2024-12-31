@@ -26,7 +26,7 @@ var stopCmd = &cobra.Command{
 		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := loadState(); err != nil {
+		if err := loadActiveTimerState(); err != nil {
 			fmt.Printf("Error loading timer state: %v\n", err)
 			return
 		}
@@ -39,7 +39,7 @@ var stopCmd = &cobra.Command{
 
 			fmt.Println("Available timers:")
 			for i, id := range timerIndexMap {
-				timer := timers[id]
+				timer := activeTimers[id]
 				remaining := time.Until(timer.Time)
 				if remaining < 0 {
 					remaining = 0

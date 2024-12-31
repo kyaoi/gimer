@@ -19,16 +19,20 @@ type Timer struct {
 //go:embed resources/sound.wav
 var embeddedSound []byte
 
+var activeTimerFile = "active_timer.json"
+var savedTimersFile = "timers.json"
+
 var (
-	mu     sync.Mutex
-	timers = make(map[string]*Timer)
+	mu           sync.Mutex
+	activeTimers = make(map[string]*Timer)
+	savedTimers  = make(map[string]*Timer)
 )
 
 var timerID string
 
 var timerIndexMap = make(map[int]string)
 
-func getStateFilePath() (string, error) {
+func getGimerDir() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -41,11 +45,54 @@ func getStateFilePath() (string, error) {
 		}
 	}
 
-	return filepath.Join(stateDir, "timer_state.json"), nil
+	return stateDir, nil
+
 }
 
-func loadState() error {
-	filePath, err := getStateFilePath()
+func getSavedTimersFilePath() (string, error) {
+	d, err := getGimerDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(d, savedTimersFile), nil
+}
+
+func getActiveTimerFilePath() (string, error) {
+	d, err := getGimerDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(d, activeTimerFile), nil
+}
+
+func loadSavedTimers() error {
+	filePath, err := getSavedTimersFilePath()
+	if err != nil {
+		return fmt.Errorf("Error loading saved timers json file: %v\n", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	var loadedTimers map[string]*Timer
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&loadedTimers); err != nil {
+		return fmt.Errorf("Failed to decode saved timers: %v\n", err)
+	}
+
+	savedTimers = loadedTimers
+
+	return nil
+}
+
+func loadActiveTimerState() error {
+	filePath, err := getActiveTimerFilePath()
 	if err != nil {
 		return fmt.Errorf("Error loading timer state json file: %v\n", err)
 	}
@@ -65,14 +112,35 @@ func loadState() error {
 		return fmt.Errorf("Failed to decode timer state: %v\n", err)
 	}
 
-	timers = loadedTimers
+	activeTimers = loadedTimers
 
 	return nil
 }
 
-func saveTimer(timer *Timer) error {
-	timers[timer.ID] = timer
-	filePath, err := getStateFilePath()
+func saveSavedTimers(timer *Timer) error {
+	savedTimers[timer.ID] = timer
+	filePath, err := getSavedTimersFilePath()
+	if err != nil {
+		return fmt.Errorf("Error loading saved timers json file: %v\n", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	file, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	return encoder.Encode(savedTimers)
+
+}
+
+func saveActiveTimer(timer *Timer) error {
+	activeTimers[timer.ID] = timer
+	filePath, err := getActiveTimerFilePath()
 	if err != nil {
 		return fmt.Errorf("Error loading timer state json file: %v\n", err)
 	}
@@ -87,12 +155,12 @@ func saveTimer(timer *Timer) error {
 	defer file.Close()
 
 	encoder := json.NewEncoder(file)
-	return encoder.Encode(timers)
+	return encoder.Encode(activeTimers)
 }
 
 func stopTimer(id string) error {
-	if timer, exists := timers[id]; exists {
-		filePath, err := getStateFilePath()
+	if timer, exists := activeTimers[id]; exists {
+		filePath, err := getActiveTimerFilePath()
 		if err != nil {
 			return fmt.Errorf("Error loading timer state json file: %v\n", err)
 		}
@@ -104,10 +172,10 @@ func stopTimer(id string) error {
 		}
 		defer file.Close()
 
-		delete(timers, id)
+		delete(activeTimers, id)
 		encoder := json.NewEncoder(file)
-		if err := encoder.Encode(timers); err != nil {
-			if err := saveTimer(timer); err != nil {
+		if err := encoder.Encode(activeTimers); err != nil {
+			if err := saveActiveTimer(timer); err != nil {
 				return fmt.Errorf("Error saving timer state: %v\n", err)
 			}
 		}
@@ -118,7 +186,7 @@ func stopTimer(id string) error {
 }
 
 func stopAllTimer() error {
-	filePath, err := getStateFilePath()
+	filePath, err := getActiveTimerFilePath()
 	if err != nil {
 		return fmt.Errorf("Error loading timer state json file: %v\n", err)
 	}
@@ -129,24 +197,24 @@ func stopAllTimer() error {
 	}
 	defer file.Close()
 
-	timerBackup := timers
-	timers = make(map[string]*Timer)
+	activeTimersBackup := activeTimers
+	activeTimers = make(map[string]*Timer)
 	encoder := json.NewEncoder(file)
-	if err := encoder.Encode(timers); err != nil {
-		timers = timerBackup
+	if err := encoder.Encode(activeTimers); err != nil {
+		activeTimers = activeTimersBackup
 		return fmt.Errorf("Error saving timer state: %v\n", err)
 	}
 	return nil
 }
 
 func getSoundRunningStateById(id string) bool {
-	_, exists := timers[id]
+	_, exists := activeTimers[id]
 	return exists
 }
 
 func generateTimerIndex() error {
 	number := 1
-	for _, timer := range timers {
+	for _, timer := range activeTimers {
 		timerIndexMap[number] = timer.ID
 		number++
 	}

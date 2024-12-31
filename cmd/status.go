@@ -12,20 +12,20 @@ var statusCmd = &cobra.Command{
 	Short: "Display the current status of all timers",
 	Long:  "Display the current status of all timers including their ID, description, and remaining time.",
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := loadState(); err != nil {
+		if err := loadActiveTimerState(); err != nil {
 			fmt.Printf("Error loading timer state: %v\n", err)
 		}
 
 		mu.Lock()
 		defer mu.Unlock()
 
-		if len(timers) == 0 {
+		if len(activeTimers) == 0 {
 			fmt.Println("No timers currently running.")
 			return
 		}
 
 		fmt.Println("Current timers:")
-		for _, timer := range timers {
+		for _, timer := range activeTimers {
 			remaining := time.Until(timer.Time)
 			if remaining < 0 {
 				remaining = 0

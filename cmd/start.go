@@ -17,6 +17,7 @@ var (
 	minutes     int
 	hours       int
 	description string
+	save        bool
 )
 
 var startCmd = &cobra.Command{
@@ -29,8 +30,9 @@ var startCmd = &cobra.Command{
 			fmt.Println("Please specify a valid duration using --seconds, --minutes, or --hours.")
 			return
 		}
-		if err := loadState(); err != nil {
+		if err := loadActiveTimerState(); err != nil {
 			fmt.Printf("Error loading timer state: %v\n", err)
+			return
 		}
 
 		id := uuid.New().String()
@@ -40,9 +42,20 @@ var startCmd = &cobra.Command{
 			Time:        time.Now().Add(duration),
 		}
 
-		if err := saveTimer(timer); err != nil {
+		if err := saveActiveTimer(timer); err != nil {
 			fmt.Printf("Error saving timer state: %v\n", err)
 			return
+		}
+
+		if save {
+			if err := loadSavedTimers(); err != nil {
+				fmt.Printf("Error loading saved timers: %v\n", err)
+				return
+			}
+			if err := saveSavedTimers(timer); err != nil {
+				fmt.Printf("Error saving timers: %v\n", err)
+				return
+			}
 		}
 
 		fmt.Printf("Timer started: ID=%s, Description=%s, Duration=%s\n", id, description, duration)
@@ -78,7 +91,7 @@ func playSound(timer *Timer) {
 
 	duration := 5 * time.Minute
 	for remaining := duration; remaining > 0; remaining -= time.Second {
-		if err := loadState(); err != nil {
+		if err := loadActiveTimerState(); err != nil {
 			fmt.Printf("Error loading timer state: %v\n", err)
 		}
 
@@ -93,7 +106,7 @@ func playSound(timer *Timer) {
 	}
 
 	mu.Lock()
-	_, exists := timers[timerID]
+	_, exists := activeTimers[timerID]
 	if exists {
 		if err := stopTimer(timerID); err != nil {
 			fmt.Printf("Error stopping timer: %v\n", err)
@@ -107,5 +120,6 @@ func init() {
 	startCmd.Flags().IntVarP(&minutes, "minutes", "m", 0, "Set timer duration in minutes")
 	startCmd.Flags().IntVar(&hours, "hours", 0, "Set timer duration in hours")
 	startCmd.Flags().StringVarP(&description, "description", "d", "Timer", "Set a description for the timer")
+	startCmd.Flags().BoolVarP(&save, "save", "S", false, "Save timer state to file")
 	rootCmd.AddCommand(startCmd)
 }
