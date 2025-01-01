@@ -31,7 +31,7 @@ var statusCmd = &cobra.Command{
 				remaining = 0
 			}
 			fmt.Printf("Description: %s, Remaining: %s\n",
-				timer.Description, remaining)
+				timer.Description, formatDuration(remaining))
 		}
 	},
 }

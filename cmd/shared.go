@@ -191,6 +191,38 @@ func saveActiveTimer(timer *ActiveTimer) error {
 	return encoder.Encode(activeTimers)
 }
 
+func deleteSavedTimer(id string) error {
+	if timer, exists := savedTimers[id]; exists {
+		p, err := getSavedTimersFilePath()
+		if err != nil {
+			return fmt.Errorf("Error loading timer state json file: %v\n", err)
+		}
+
+		f, err := os.Create(p)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		delete(savedTimers, id)
+		encoder := json.NewEncoder(f)
+		if err := encoder.Encode(savedTimers); err != nil {
+			savedTimer := &ActiveTimer{
+				ID:           timer.ID,
+				Description:  timer.Description,
+				Duration:     timer.Duration,
+				TriggerTimer: time.Now().Add(timer.Duration),
+			}
+			if err := saveSavedTimers(savedTimer); err != nil {
+				return fmt.Errorf("Error saving timer: %v\n", err)
+			}
+		}
+		fmt.Println("Deleted timer with description:", timer.Description)
+		return nil
+	}
+	return fmt.Errorf("Timer not found")
+}
+
 func stopTimer(id string) error {
 	if timer, exists := activeTimers[id]; exists {
 		p, err := getActiveTimerFilePath()
@@ -198,7 +230,6 @@ func stopTimer(id string) error {
 			return fmt.Errorf("Error loading timer state json file: %v\n", err)
 		}
 
-		fmt.Println("Stopping timer with ID:", id)
 		f, err := os.Create(p)
 		if err != nil {
 			return err
@@ -240,7 +271,7 @@ func stopAllTimer() error {
 	return nil
 }
 
-func getSoundRunningStateById(id string) bool {
+func getActiveTimerById(id string) bool {
 	_, exists := activeTimers[id]
 	return exists
 }
@@ -268,4 +299,8 @@ func generateTimerIndex(ids []string, m map[int]string) error {
 		number++
 	}
 	return nil
+}
+
+func formatDuration(d time.Duration) string {
+	return d.Truncate(time.Second).String()
 }

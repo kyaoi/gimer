@@ -152,7 +152,18 @@ var startCmd = &cobra.Command{
 
 func runTimer(timer *ActiveTimer) {
 	duration := time.Until(timer.TriggerTimer)
-	time.Sleep(duration)
+	for remaining := duration; remaining > 0; remaining -= time.Second {
+		if err := loadActiveTimerState(); err != nil {
+			fmt.Printf("Error loading timer state: %v\n", err)
+			return
+		}
+		exists := getActiveTimerById(timer.ID)
+		if !exists {
+			fmt.Println("Timer has been deleted")
+			return
+		}
+		time.Sleep(time.Second)
+	}
 
 	fmt.Printf("Timer ended: Description=%s\n", timer.Description)
 	playSound(timer)
@@ -181,7 +192,7 @@ func playSound(timer *ActiveTimer) {
 			fmt.Printf("Error loading timer state: %v\n", err)
 		}
 
-		exists := getSoundRunningStateById(timer.ID)
+		exists := getActiveTimerById(timer.ID)
 
 		if !exists {
 			fmt.Println("Sound stopped")
