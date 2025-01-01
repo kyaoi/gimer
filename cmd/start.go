@@ -20,8 +20,8 @@ var (
 	minutes      int
 	hours        int
 	description  string
-	save         bool
-	useSaveTimer bool
+	saveFlag     bool
+	useSaveTimerFlag bool
 )
 
 var startCmd = &cobra.Command{
@@ -29,15 +29,15 @@ var startCmd = &cobra.Command{
 	Short: "Start a new timer",
 	Long:  "Start a new timer with a specified duration and description.",
 	PreRun: func(cmd *cobra.Command, args []string) {
-		if useSaveTimer && seconds != 0 || useSaveTimer && minutes != 0 || useSaveTimer && hours != 0 {
+		if useSaveTimerFlag && seconds != 0 || useSaveTimerFlag && minutes != 0 || useSaveTimerFlag && hours != 0 {
 			fmt.Println("Error: --use cannot be used with --seconds, --minutes, or --hours.")
 			os.Exit(1)
 		}
-		if useSaveTimer && description != "Timer" {
+		if useSaveTimerFlag && description != "Timer" {
 			fmt.Println("Error: --use cannot be used with --description.")
 			os.Exit(1)
 		}
-		if useSaveTimer && save {
+		if useSaveTimerFlag && saveFlag {
 			fmt.Println("Error: --use and --save cannot be used together.")
 			os.Exit(1)
 		}
@@ -48,7 +48,7 @@ var startCmd = &cobra.Command{
 			return
 		}
 
-		if useSaveTimer {
+		if useSaveTimerFlag {
 			if err := loadSavedTimers(); err != nil {
 				fmt.Printf("Error loading saved timers: %v\n", err)
 				return
@@ -133,7 +133,7 @@ var startCmd = &cobra.Command{
 			return
 		}
 
-		if save {
+		if saveFlag {
 			if err := loadSavedTimers(); err != nil {
 				fmt.Printf("Error loading saved timers: %v\n", err)
 				return
@@ -217,7 +217,7 @@ func init() {
 	startCmd.Flags().IntVarP(&minutes, "minutes", "M", 0, "Set timer duration in minutes")
 	startCmd.Flags().IntVarP(&hours, "hours", "H", 0, "Set timer duration in hours")
 	startCmd.Flags().StringVarP(&description, "description", "d", "Timer", "Set a description for the timer")
-	startCmd.Flags().BoolVarP(&save, "save", "s", false, "Save timer state to file")
-	startCmd.Flags().BoolVarP(&useSaveTimer, "use", "u", false, "Use a saved timer")
+	startCmd.Flags().BoolVarP(&saveFlag, "save", "s", false, "Save timer state to file")
+	startCmd.Flags().BoolVarP(&useSaveTimerFlag, "use", "u", false, "Use a saved timer")
 	rootCmd.AddCommand(startCmd)
 }
