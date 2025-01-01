@@ -1,4 +1,4 @@
-module gimer
+module github.com/kyaoi/gimer
 
 go 1.23.2
 
