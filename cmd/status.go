@@ -14,7 +14,7 @@ var (
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Display the current status of all timers",
-	Long:  "Display the current status of all timers including their ID, description, and remaining time.",
+	Long:  "Display the current status of all timers including their description, and remaining (or duration) time.",
 	Run: func(cmd *cobra.Command, args []string) {
 		if showSavedTimersFlag {
 			if err := loadSavedTimers(); err != nil {
