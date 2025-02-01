@@ -3,6 +3,9 @@
 gimer is a CLI timer tool written in Go.
 It allows users to create a timer for a specified duration and plays a notification sound when the timer ends.
 
+![image](https://github.com/user-attachments/assets/204edf33-8f29-414f-9426-32b9302bb8ab)
+![image](https://github.com/user-attachments/assets/5a70576f-b668-41c6-b065-f2a748cb5d01)
+
 ## Features
 
 - Set time duration (seconds, minutes, hours)
