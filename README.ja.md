@@ -3,6 +3,9 @@
 gimerはGo言語で作られたCLIタイマーツールです。
 指定した時間のタイマーを作成し、終了時に通知音がなります。
 
+![image](https://github.com/user-attachments/assets/204edf33-8f29-414f-9426-32b9302bb8ab)
+![image](https://github.com/user-attachments/assets/5a70576f-b668-41c6-b065-f2a748cb5d01)
+
 ## 特徴
 - 時間の指定が可能（秒、分、時間）
 - タイマーの一時停止および再開機能
