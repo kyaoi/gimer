@@ -228,6 +228,16 @@ func runTimer(timer *ActiveTimer) {
 	}
 
 	if err := g.SetKeybinding("", 'q', gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
+		mu.Lock()
+		exists := getActiveTimerById(timer.ID)
+		if !exists {
+			panic("Timer not found")
+		}
+		if err := stopTimer(timer.ID); err != nil {
+			mu.Unlock()
+			panic(err)
+		}
+		mu.Unlock()
 		return gocui.ErrQuit
 	}); err != nil {
 		panic(err)
